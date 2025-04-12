@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participation Record</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      .container {
+        background-color: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .form-title {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      .btn-custom {
+        width: 100%;
+      }
+
+      .results-container {
+        margin-top: 30px;
+        padding: 20px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      #results-text {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body class="bg-light">
+    <div class="container my-5">
+      <h1 class="form-title">Check Participation</h1>
+      <!-- Form -->
+      <form>
+        <div class="mb-3">
+          <label for="name" class="form-label">Name</label>
+          <input type="text" class="form-control" id="name" placeholder="Enter your Name">
+        </div>
+        <div class="mb-3">
+          <label for="user-email" class="form-label">Email</label>
+          <input type="email" class="form-control" id="user-email" placeholder="Enter your Email">
+        </div>
+        <div class="mb-3">
+          <label for="class-date" class="form-label">Class Date</label>
+          <input type="date" class="form-control" id="class-date">
+        </div>
+        <div class="mb-3">
+          <label for="image-upload" class="form-label">Upload Image</label>
+          <input type="file" class="form-control" id="image-upload" accept="image/*">
+        </div>
+        <button type="button" class="btn btn-primary btn-custom" onclick="processImage()">Submit</button>
+      </form>
+      <div id="results" class="results-container mt-4">
+        <h4>Results:</h4>
+        <pre id="results-text">Waiting for response...</pre>
+      </div>
+    </div>
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      async function processImage() {
+        const name = document.getElementById("name").value;
+        const email = document.getElementById("user-email").value;
+        const classDate = document.getElementById("class-date").value;
+        const fileInput = document.getElementById("image-upload");
+        if (!name || !email || !classDate || !fileInput.files[0]) {
+          alert("Please fill in all fields and upload an image.");
+          return;
+        }
+        // Display loading message
+        document.getElementById("results-text").innerText = "Processing...";
+        try {
+          // Convert the image to base64
+          const imageBase64 = await toBase64(fileInput.files[0]);
+          // Send the data to the Lambda function via API Gateway
+          const response = await fetch("https://cw3ni5f3g6.execute-api.us-east-2.amazonaws.com/dev/processImage", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              name: name,
+              user_email: email,
+              class_date: classDate,
+              image_data: imageBase64.split(',')[1] // Remove the data URL prefix
+            })
+          });
+          const data = await response.json();
+          console.log(data); // Log the response from the API
+          // Parse the body field (which is a stringified JSON object)
+          const responseBody = JSON.parse(data.body);
+          // Handle the response based on the student participation status
+          if (responseBody.participation === true) {
+            if (responseBody.face_matched === true && responseBody.name_matched === true) {
+              // Both face and name matched -> The student is considered as present in class
+              document.getElementById("results-text").innerText = `Participation Status: ✅ Present in Class (Face and Name Matched)`;
+            } else if (responseBody.face_matched === true && responseBody.name_matched === false) {
+              // Only face matched -> The student is considered as present in class
+              document.getElementById("results-text").innerText = `Participation Status: ✅ Present in Class (Face Matched Only)`;
+            } else if (responseBody.name_matched === true && responseBody.face_matched === false) {
+              // Only name matched -> The student is considered as a Zoom attendee
+              document.getElementById("results-text").innerText = `Zoom Participation Status: ✅ Attended via Zoom (Name Matched Only)`;
+            } else {
+              // If participation is true but no specific match is found, display a generic message
+              document.getElementById("results-text").innerText = `Participation Status: ✅ Confirmed (No Specific Match Details)`;
+            }
+          } else {
+            // If participation is false, we assume no match was found
+            document.getElementById("results-text").innerText = `Participation Status: ❌ No Match Found`;
+          }
+          // Clear the input fields after submission
+          document.getElementById("name").value = '';
+          document.getElementById("user-email").value = '';
+          document.getElementById("class-date").value = '';
+          document.getElementById("image-upload").value = '';
+        } catch (error) {
+          console.error("Error processing the image", error);
+          document.getElementById("results-text").innerText = "Error processing the image.";
+        }
+      }
+      // Function to convert a file to base64
+      function toBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = error => reject(error);
+        });
+      }
+    </script>
+  </body>
+</html>
