@@ -83,7 +83,7 @@
           // Convert the image to base64
           const imageBase64 = await toBase64(fileInput.files[0]);
           // Send the data to the Lambda function via API Gateway
-          const response = await fetch("https://5wbfsg3139.execute-api.us-east-2.amazonaws.com/prod/", {
+          const response = await fetch("https://5wbfsg3139.execute-api.us-east-2.amazonaws.com/prod/processImage", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
